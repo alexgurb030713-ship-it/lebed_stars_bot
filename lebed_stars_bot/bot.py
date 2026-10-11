@@ -3,10 +3,10 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # Замените на ваш токен от @BotFather
-BOT_TOKEN = "ВАШ_ТОКЕН_БОТА"
+BOT_TOKEN = "8552008796:AAHNDC_Xe6wUvHoE6HwO8DkU00hmhRI3EHU"
 
 # Ваша ссылка с Render (или локальная ссылка для тестов)
-WEB_APP_URL = "https://chayok-bot-xxxx.onrender.com"
+WEB_APP_URL = "https://lebed-stars-bot.onrender.com"
 
 logging.basicConfig(level=logging.INFO)
 
