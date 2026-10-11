@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import database
 import random
 import os
-import bot  # Подключаем наш файл bot.py
+from bot import get_bot_application
 
 app = FastAPI()
 
@@ -17,13 +17,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+bot_app = get_bot_application()
+
 @app.on_event("startup")
 async def startup():
-    # 1. Инициализируем базу данных
     await database.init_db()
-    
-    # 2. Запускаем Telegram-бота в фоновом режиме
-    asyncio.create_task(bot.start_bot())
+    # Запускаем поллинг Telegram-бота в фоне
+    await bot_app.initialize()
+    await bot_app.start()
+    asyncio.create_task(bot_app.updater.start_polling(drop_pending_updates=True))
+
+@app.on_event("shutdown")
+async def shutdown():
+    await bot_app.stop()
+    await bot_app.shutdown()
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
