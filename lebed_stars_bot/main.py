@@ -1,10 +1,11 @@
+import asyncio
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 import database
 import random
 import os
+import bot
 
 app = FastAPI()
 
@@ -18,10 +19,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    # 1. Инициализируем БД
     await database.init_db()
-
-class UserData(BaseModel):
-    user_id: int
+    # 2. Запускаем бота в фоновой задаче
+    asyncio.create_task(bot.run_bot())
 
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
@@ -31,16 +32,18 @@ async def read_index():
     return "<h1>Файл index.html не найден</h1>"
 
 @app.post("/get_user")
-async def get_user_data(data: UserData):
-    return await database.get_user(data.user_id)
+async def get_user_data(data: dict):
+    user_id = data.get("user_id")
+    return await database.get_user(user_id)
 
 @app.post("/inventory")
-async def get_inventory(data: UserData):
-    return await database.get_inventory(data.user_id)
+async def get_inventory(data: dict):
+    user_id = data.get("user_id")
+    return await database.get_inventory(user_id)
 
 @app.post("/open_case")
-async def open_case(data: UserData):
-    # Возможные призы из кейса со звездами
+async def open_case(data: dict):
+    user_id = data.get("user_id")
     possible_drops = [
         {"name": "🍀 Счастливый клевер", "stars": 1},
         {"name": "🎁 Золотой подарок", "stars": 5},
@@ -48,7 +51,7 @@ async def open_case(data: UserData):
         {"name": "💎 Легендарная звезда", "stars": 50}
     ]
     drop = random.choices(possible_drops, weights=[50, 30, 15, 5], k=1)[0]
-    return await database.open_case(data.user_id, drop["stars"], drop["name"])
+    return await database.open_case(user_id, drop["stars"], drop["name"])
 
 @app.get("/top")
 async def get_top():
