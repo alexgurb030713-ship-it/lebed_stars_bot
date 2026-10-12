@@ -44,3 +44,12 @@ async def get_inventory(user_id: int):
         async with db.execute("SELECT item_name FROM inventory WHERE user_id = ?", (user_id,)) as cursor:
             rows = await cursor.fetchall()
             return [row[0] for row in rows]
+        
+async def get_top_players(limit: int = 10):
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute(
+            "SELECT user_id, stars FROM users ORDER BY stars DESC LIMIT ?", 
+            (limit,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [{"user_id": row[0], "stars": row[1]} for row in rows]
