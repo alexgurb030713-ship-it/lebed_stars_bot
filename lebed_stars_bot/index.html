@@ -108,3 +108,30 @@
     </script>
 </body>
 </html>
+<!-- Экран выбора кейсов -->
+<div id="cases-screen" class="screen">
+  <h2>📦 Выберите кейс</h2>
+  
+  <div class="case-card">
+    <h3>Бесплатный кейс</h3>
+    <button onclick="openCase('case_1')">Открыть бесплатно</button>
+  </div>
+
+  <div class="case-card">
+    <h3>Кейс 100 ⭐</h3>
+    <button onclick="openCase('case_2')">Открыть за 100 ⭐</button>
+  </div>
+
+  <div class="case-card">
+    <h3>Кейс 500 ⭐</h3>
+    <button onclick="openCase('case_3')">Открыть за 500 ⭐</button>
+  </div>
+</div>
+
+<!-- Экран инвентаря (только предметы) -->
+<div id="inventory-screen" class="screen" style="display:none;">
+  <h2>🎒 Ваш Инвентарь</h2>
+  <div id="inventory-list">
+    <!-- Сюда подгружаются только подарки/предметы -->
+  </div>
+</div>
