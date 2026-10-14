@@ -1,4 +1,5 @@
 import asyncio
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,42 +39,44 @@ async def read_index():
             return f.read()
     return "<h1>Файл index.html не найден</h1>"
 
-# Конфигурация кейсов, цен и шансов выпадения
 CASES_CONFIG = {
     "case_1": {
         "name": "Бесплатный кейс",
         "price": 0,
+        "cooldown": 86400, # 24 часа в секундах
         "drops": [
             {"type": "stars", "val": 1, "weight": 75},
             {"type": "stars", "val": 2, "weight": 10},
-            {"type": "item", "val": "🧸 Мишка", "weight": 5},
+            {"type": "item", "val": "🧸 Мишка", "weight": 2.5},
             {"type": "item", "val": "🎁 Подарок", "weight": 2.5},
             {"type": "item", "val": "🌹 Роза", "weight": 2.5},
-            {"type": "item", "val": "❤️ Сердце", "weight": 5},
+            {"type": "item", "val": "❤️ Сердце", "weight": 2.5},
         ]
     },
     "case_2": {
         "name": "Кейс за 100 звёзд",
         "price": 100,
+        "cooldown": 0,
         "drops": [
             {"type": "stars", "val": 50, "weight": 75},
             {"type": "stars", "val": 75, "weight": 10},
-            {"type": "item", "val": "🚀 Ракета", "weight": 5},
+            {"type": "item", "val": "🚀 Ракета", "weight": 2.5},
             {"type": "item", "val": "💍 Кольцо", "weight": 2.5},
             {"type": "item", "val": "🏆 Кубок", "weight": 2.5},
-            {"type": "item", "val": "💎 Алмаз", "weight": 5},
+            {"type": "item", "val": "💎 Алмаз", "weight": 2.5},
         ]
     },
     "case_3": {
         "name": "Кейс за 500 звёзд",
         "price": 500,
+        "cooldown": 0,
         "drops": [
             {"type": "stars", "val": 250, "weight": 75},
             {"type": "stars", "val": 400, "weight": 10},
-            {"type": "item", "val": "🍦 Мороженое", "weight": 5},
+            {"type": "item", "val": "🍦 Мороженое", "weight": 2.5},
             {"type": "item", "val": "🗽 Статуя Свободы", "weight": 2.5},
             {"type": "item", "val": "🕶️ Снуп Догг", "weight": 2.5},
-            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight": 5},
+            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight":2.5},
         ]
     }
 }
@@ -86,8 +89,7 @@ async def get_user_data(data: dict):
 @app.post("/inventory")
 async def get_inventory(data: dict):
     user_id = data.get("user_id")
-    items = await database.get_inventory(user_id)
-    return items
+    return await database.get_inventory(user_id)
 
 @app.get("/top")
 async def get_top():
@@ -103,12 +105,28 @@ async def open_case(data: dict):
         
     case_info = CASES_CONFIG[case_id]
     user = await database.get_user(user_id)
+    current_time = time.time()
     
+    # Проверка кулдауна для бесплатного кейса
+    if case_id == "case_1":
+        last_open = user.get("last_free_open", 0)
+        time_passed = current_time - last_open
+        if time_passed < case_info["cooldown"]:
+            remaining = int(case_info["cooldown"] - time_passed)
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            return {"error": f"Бесплатный кейс будет доступен через {hours} ч. {minutes} мин."}
+    
+    # Проверка баланса для платных кейсов
     if user.get("stars", 0) < case_info["price"]:
         return {"error": "Недостаточно звёзд на балансе!"}
     
     if case_info["price"] > 0:
         await database.update_user_stars(user_id, -case_info["price"])
+
+    # Если открыли бесплатный кейс — фиксируем время
+    if case_id == "case_1":
+        await database.update_last_free_open(user_id, current_time)
 
     drops = case_info["drops"]
     weights = [d["weight"] for d in drops]

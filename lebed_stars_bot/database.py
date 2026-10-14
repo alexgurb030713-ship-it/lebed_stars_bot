@@ -1,4 +1,5 @@
 import aiosqlite
+import time
 
 DB_NAME = "database.db"
 
@@ -7,7 +8,8 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                stars INTEGER DEFAULT 0
+                stars INTEGER DEFAULT 0,
+                last_free_open REAL DEFAULT 0
             )
         """)
         await db.execute("""
@@ -21,17 +23,22 @@ async def init_db():
 
 async def get_user(user_id: int):
     async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT stars FROM users WHERE user_id = ?", (user_id,)) as cursor:
+        async with db.execute("SELECT stars, last_free_open FROM users WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
             if row:
-                return {"user_id": user_id, "stars": row[0]}
-            await db.execute("INSERT INTO users (user_id, stars) VALUES (?, ?)", (user_id, 0))
+                return {"user_id": user_id, "stars": row[0], "last_free_open": row[1]}
+            await db.execute("INSERT INTO users (user_id, stars, last_free_open) VALUES (?, ?, ?)", (user_id, 0, 0))
             await db.commit()
-            return {"user_id": user_id, "stars": 0}
+            return {"user_id": user_id, "stars": 0, "last_free_open": 0}
 
 async def update_user_stars(user_id: int, amount: int):
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("UPDATE users SET stars = stars + ? WHERE user_id = ?", (amount, user_id))
+        await db.commit()
+
+async def update_last_free_open(user_id: int, timestamp: float):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("UPDATE users SET last_free_open = ? WHERE user_id = ?", (timestamp, user_id))
         await db.commit()
 
 async def add_item_to_inventory(user_id: int, item_name: str):
@@ -44,7 +51,7 @@ async def get_inventory(user_id: int):
         async with db.execute("SELECT item_name FROM inventory WHERE user_id = ?", (user_id,)) as cursor:
             rows = await cursor.fetchall()
             return [row[0] for row in rows]
-        
+
 async def get_top_players(limit: int = 10):
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute(

@@ -60,7 +60,6 @@
             display: flex;
         }
 
-        /* --- Стили рулетки CS:GO --- */
         .roulette-wrapper {
             position: relative;
             width: 100%;
@@ -72,7 +71,6 @@
             box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
             margin-bottom: 10px;
         }
-        /* Указатель по центру */
         .roulette-pointer {
             position: absolute;
             top: 0;
@@ -93,7 +91,6 @@
             border-right: 8px solid transparent;
             border-top: 10px solid #f43f5e;
         }
-        /* Лента рулетки */
         .roulette-track {
             display: flex;
             position: absolute;
@@ -121,7 +118,6 @@
             box-sizing: border-box;
             padding: 5px;
         }
-        /* ----------------------- */
 
         .case-card {
             background: rgba(255, 255, 255, 0.05);
@@ -182,10 +178,7 @@
         <button class="nav-btn secondary" onclick="switchScreen('leaderboard')">🏆 Топ</button>
     </div>
 
-    <!-- Экран кейсов с рулеткой -->
     <div id="cases-screen" class="screen active">
-        
-        <!-- Окно рулетки -->
         <div class="roulette-wrapper">
             <div class="roulette-pointer"></div>
             <div class="roulette-track" id="roulette-track"></div>
@@ -209,13 +202,11 @@
         </div>
     </div>
 
-    <!-- Экран инвентаря -->
     <div id="inventory-screen" class="screen">
         <h3>Ваши уникальные предметы</h3>
         <div id="inventory-list"></div>
     </div>
 
-    <!-- Экран топа -->
     <div id="leaderboard-screen" class="screen">
         <h3>🏆 Топ игроков по звёздам</h3>
         <div id="leaderboard-list"></div>
@@ -227,15 +218,15 @@
 
         const userId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 1;
         let isSpinning = false;
+        let lastFreeOpenTime = 0;
+        const COOLDOWN_TIME = 86400; // 24 часа в секундах
 
-        // Популярные предметы для наполнения ленты
         const ALL_ITEMS = [
-            "1 ⭐", "2 ⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
+            "1 ⭐", "2⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
             "50 ⭐", "75 ⭐", "🚀 Ракета", "💍 Кольцо", "🏆 Кубок", "💎 Алмаз",
             "250 ⭐", "400 ⭐", "🍦 Мороженое", "🗽 Статуя", "🕶️ Снуп Догг", "🎅 Шапка"
         ];
 
-        // Заполнение рулетки случайными элементами по умолчанию
         function initRoulette() {
             const track = document.getElementById('roulette-track');
             track.style.transition = 'none';
@@ -259,8 +250,33 @@
                 });
                 const data = await response.json();
                 document.getElementById('user-balance').innerText = `Баланс: ${data.stars} ⭐`;
+                
+                lastFreeOpenTime = data.last_free_open || 0;
+                checkFreeCaseTimer();
             } catch (e) { console.error(e); }
         }
+
+        function checkFreeCaseTimer() {
+            const btn1 = document.getElementById('btn-case1');
+            const now = Date.now() / 1000;
+            const timePassed = now - lastFreeOpenTime;
+
+            if (timePassed < COOLDOWN_TIME) {
+                const remaining = Math.ceil(COOLDOWN_TIME - timePassed);
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = remaining % 60;
+                
+                btn1.disabled = true;
+                btn1.innerText = `Доступно через ${hours}ч ${minutes}м`;
+            } else if (!isSpinning) {
+                btn1.disabled = false;
+                btn1.innerText = "Открыть бесплатно";
+            }
+        }
+
+        // Обновляем таймер каждую секунду
+        setInterval(checkFreeCaseTimer, 1000);
 
         async function openCase(caseId) {
             if (isSpinning) return;
@@ -285,10 +301,11 @@
                     return;
                 }
 
-                // ВЫПАВШИЙ ДРОП
-                const winningText = data.type === 'stars' ? `${data.amount} ⭐` : data.name;
+                if (caseId === 'case_1') {
+                    lastFreeOpenTime = Date.now() / 1000;
+                }
 
-                // Запускаем анимацию прокрутки рулетки
+                const winningText = data.type === 'stars' ? `${data.amount} ⭐` : data.name;
                 spinRoulette(winningText, data.msg);
 
             } catch (e) {
@@ -302,12 +319,11 @@
             isSpinning = true;
             const track = document.getElementById('roulette-track');
             
-            // Пересоздаем ленту для анимации
             track.style.transition = 'none';
             track.style.transform = 'translateX(0px)';
             track.innerHTML = '';
 
-            const WIN_INDEX = 45; // Победный элемент ставим на 45-е место
+            const WIN_INDEX = 45;
 
             for (let i = 0; i < 60; i++) {
                 const card = document.createElement('div');
@@ -323,14 +339,9 @@
                 track.appendChild(card);
             }
 
-            // Ширина карточки (80px) + margin-left/right (10px) = 90px
             const cardWidth = 90; 
             const wrapperWidth = document.querySelector('.roulette-wrapper').offsetWidth;
-            
-            // Расчет позиции так, чтобы 45-й элемент встал ровно под ролик
             const targetOffset = (WIN_INDEX * cardWidth) - (wrapperWidth / 2) + (cardWidth / 2);
-
-            // Небольшой рандомное смещение внутри карточки для реалистичности
             const randomShift = Math.floor(Math.random() * 30) - 15;
 
             setTimeout(() => {
@@ -338,7 +349,6 @@
                 track.style.transform = `translateX(-${targetOffset + randomShift}px)`;
             }, 50);
 
-            // После завершения рулетки (5 секунд) показываем сообщение
             setTimeout(() => {
                 const modal = document.getElementById('result-modal');
                 modal.style.display = 'block';
@@ -351,7 +361,11 @@
         }
 
         function setButtonsDisabled(disabled) {
-            document.querySelectorAll('.action-btn').forEach(btn => btn.disabled = disabled);
+            document.querySelectorAll('.action-btn').forEach(btn => {
+                // Бесплатную кнопку управляем отдельно через таймер
+                if (btn.id === 'btn-case1' && disabled) return;
+                btn.disabled = disabled;
+            });
         }
 
         async function loadInventory() {
@@ -391,9 +405,9 @@
                     const div = document.createElement('div');
                     div.className = 'inventory-item';
                     let medal = `#${index + 1}`;
-                    if (index === 0) medal = '🥇';
-                    if (index === 1) medal = '🥈';
-                    if (index === 2) medal = '🥉';
+                    if (index === 0) medal = '🥇 ПРИЗ 50 ⭐';
+                    if (index === 1) medal = '🥈 ПРИЗ 25 ⭐';
+                    if (index === 2) medal = '🥉 ПРИЗ 15 ⭐';
                     div.innerHTML = `<span>${medal} ID: ${player.user_id}</span><strong>${player.stars} ⭐</strong>`;
                     listDiv.appendChild(div);
                 });
