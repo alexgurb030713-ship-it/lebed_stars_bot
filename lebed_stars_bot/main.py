@@ -44,8 +44,8 @@ CASES_CONFIG = {
         "name": "Бесплатный кейс",
         "price": 0,
         "drops": [
-            {"type": "stars", "val": 10, "weight": 75},
-            {"type": "stars", "val": 25, "weight": 10},
+            {"type": "stars", "val": 1, "weight": 75},
+            {"type": "stars", "val": 2, "weight": 10},
             {"type": "item", "val": "🧸 Мишка", "weight": 5},
             {"type": "item", "val": "🎁 Подарок", "weight": 2.5},
             {"type": "item", "val": "🌹 Роза", "weight": 2.5},
