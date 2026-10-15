@@ -8,6 +8,7 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
+                username TEXT,
                 stars INTEGER DEFAULT 0,
                 last_free_open REAL DEFAULT 0
             )
@@ -21,15 +22,21 @@ async def init_db():
         """)
         await db.commit()
 
-async def get_user(user_id: int):
+async def get_user(user_id: int, username: str = ""):
     async with aiosqlite.connect(DB_NAME) as db:
-        async with db.execute("SELECT stars, last_free_open FROM users WHERE user_id = ?", (user_id,)) as cursor:
+        async with db.execute("SELECT stars, last_free_open, username FROM users WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
             if row:
-                return {"user_id": user_id, "stars": row[0], "last_free_open": row[1]}
-            await db.execute("INSERT INTO users (user_id, stars, last_free_open) VALUES (?, ?, ?)", (user_id, 0, 0))
+                # Если юзернейм изменился, обновим его в базе
+                if username and row[2] != username:
+                    await db.execute("UPDATE users SET username = ? WHERE user_id = ?", (username, user_id))
+                    await db.commit()
+                return {"user_id": user_id, "username": username or row[2], "stars": row[0], "last_free_open": row[1]}
+            
+            # Если пользователя нет — создаем
+            await db.execute("INSERT INTO users (user_id, username, stars, last_free_open) VALUES (?, ?, ?, ?)", (user_id, username, 0, 0))
             await db.commit()
-            return {"user_id": user_id, "stars": 0, "last_free_open": 0}
+            return {"user_id": user_id, "username": username, "stars": 0, "last_free_open": 0}
 
 async def update_user_stars(user_id: int, amount: int):
     async with aiosqlite.connect(DB_NAME) as db:
@@ -55,8 +62,8 @@ async def get_inventory(user_id: int):
 async def get_top_players(limit: int = 10):
     async with aiosqlite.connect(DB_NAME) as db:
         async with db.execute(
-            "SELECT user_id, stars FROM users ORDER BY stars DESC LIMIT ?", 
+            "SELECT user_id, username, stars FROM users ORDER BY stars DESC LIMIT ?", 
             (limit,)
         ) as cursor:
             rows = await cursor.fetchall()
-            return [{"user_id": row[0], "stars": row[1]} for row in rows]
+            return [{"user_id": row[0], "username": row[1], "stars": row[2]} for row in rows]

@@ -84,7 +84,8 @@ CASES_CONFIG = {
 @app.post("/get_user")
 async def get_user_data(data: dict):
     user_id = data.get("user_id")
-    return await database.get_user(user_id)
+    username = data.get("username", "Игрок")
+    return await database.get_user(user_id, username)
 
 @app.post("/inventory")
 async def get_inventory(data: dict):

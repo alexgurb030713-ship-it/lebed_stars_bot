@@ -30,19 +30,19 @@
         }
         .nav-buttons {
             display: flex;
-            gap: 10px;
+            gap: 6px;
             margin-bottom: 15px;
             width: 100%;
             max-width: 400px;
         }
         .nav-btn {
             flex: 1;
-            padding: 12px;
+            padding: 10px 5px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             background: var(--tg-theme-button-color, #3b82f6);
             color: var(--tg-theme-button-text-color, #ffffff);
-            font-size: 15px;
+            font-size: 13px;
             font-weight: bold;
             cursor: pointer;
         }
@@ -153,6 +153,7 @@
             justify-content: space-between;
             align-items: center;
             border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
         }
         #result-modal {
             padding: 12px;
@@ -163,6 +164,13 @@
             font-weight: bold;
             display: none;
         }
+        .profile-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -172,12 +180,15 @@
         <div class="balance" id="user-balance">Баланс: загрузка... ⭐</div>
     </div>
 
+    <!-- Навигация (добавлена кнопка Профиль) -->
     <div class="nav-buttons">
         <button class="nav-btn" onclick="switchScreen('cases')">📦 Кейсы</button>
         <button class="nav-btn secondary" onclick="switchScreen('inventory')">🎒 Инвентарь</button>
         <button class="nav-btn secondary" onclick="switchScreen('leaderboard')">🏆 Топ</button>
+        <button class="nav-btn secondary" onclick="switchScreen('profile')">👤 Профиль</button>
     </div>
 
+    <!-- Экран кейсов -->
     <div id="cases-screen" class="screen active">
         <div class="roulette-wrapper">
             <div class="roulette-pointer"></div>
@@ -202,27 +213,42 @@
         </div>
     </div>
 
+    <!-- Экран инвентаря -->
     <div id="inventory-screen" class="screen">
         <h3>Ваши уникальные предметы</h3>
         <div id="inventory-list"></div>
     </div>
 
+    <!-- Экран топа (теперь с Юзернеймом и ID) -->
     <div id="leaderboard-screen" class="screen">
-        <h3>🏆 Топ игроков по звёздам</h3>
+        <h3>🏆 Топ игроков</h3>
         <div id="leaderboard-list"></div>
+    </div>
+
+    <!-- Экран профиля -->
+    <div id="profile-screen" class="screen">
+        <h3>👤 Ваш профиль</h3>
+        <div class="profile-card">
+            <p><strong>Имя / Username:</strong> <span id="prof-username">-</span></p>
+            <p><strong>Telegram ID:</strong> <span id="prof-userid">-</span></p>
+        </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const userId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 1;
+        // Достаем данные пользователя из Telegram WebApp
+        const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 1, username: "TestUser", first_name: "Тестер" };
+        const userId = tgUser.id;
+        const username = tgUser.username ? `@${tgUser.username}` : (tgUser.first_name || "Игрок");
+
         let isSpinning = false;
         let lastFreeOpenTime = 0;
-        const COOLDOWN_TIME = 86400; // 24 часа в секундах
+        const COOLDOWN_TIME = 86400;
 
         const ALL_ITEMS = [
-            "1 ⭐", "2⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
+            "10 ⭐", "25 ⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
             "50 ⭐", "75 ⭐", "🚀 Ракета", "💍 Кольцо", "🏆 Кубок", "💎 Алмаз",
             "250 ⭐", "400 ⭐", "🍦 Мороженое", "🗽 Статуя", "🕶️ Снуп Догг", "🎅 Шапка"
         ];
@@ -246,13 +272,17 @@
                 const response = await fetch('/get_user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId })
+                    body: JSON.stringify({ user_id: userId, username: username })
                 });
                 const data = await response.json();
                 document.getElementById('user-balance').innerText = `Баланс: ${data.stars} ⭐`;
                 
                 lastFreeOpenTime = data.last_free_open || 0;
                 checkFreeCaseTimer();
+
+                // Заполняем профиль
+                document.getElementById('prof-username').innerText = data.username || username;
+                document.getElementById('prof-userid').innerText = userId;
             } catch (e) { console.error(e); }
         }
 
@@ -265,7 +295,6 @@
                 const remaining = Math.ceil(COOLDOWN_TIME - timePassed);
                 const hours = Math.floor(remaining / 3600);
                 const minutes = Math.floor((remaining % 3600) / 60);
-                const seconds = remaining % 60;
                 
                 btn1.disabled = true;
                 btn1.innerText = `Доступно через ${hours}ч ${minutes}м`;
@@ -275,7 +304,6 @@
             }
         }
 
-        // Обновляем таймер каждую секунду
         setInterval(checkFreeCaseTimer, 1000);
 
         async function openCase(caseId) {
@@ -362,7 +390,6 @@
 
         function setButtonsDisabled(disabled) {
             document.querySelectorAll('.action-btn').forEach(btn => {
-                // Бесплатную кнопку управляем отдельно через таймер
                 if (btn.id === 'btn-case1' && disabled) return;
                 btn.disabled = disabled;
             });
@@ -405,10 +432,14 @@
                     const div = document.createElement('div');
                     div.className = 'inventory-item';
                     let medal = `#${index + 1}`;
-                    if (index === 0) medal = '🥇 ПРИЗ 50 ⭐';
-                    if (index === 1) medal = '🥈 ПРИЗ 25 ⭐';
-                    if (index === 2) medal = '🥉 ПРИЗ 15 ⭐';
-                    div.innerHTML = `<span>${medal} ID: ${player.user_id}</span><strong>${player.stars} ⭐</strong>`;
+                    if (index === 0) medal = '🥇';
+                    if (index === 1) medal = '🥈';
+                    if (index === 2) medal = '🥉';
+                    
+                    div.innerHTML = `
+                        <span>${medal} <strong>${player.username || 'Игрок'}</strong> <small>(ID: ${player.user_id})</small></span>
+                        <strong>${player.stars} ⭐</strong>
+                    `;
                     listDiv.appendChild(div);
                 });
             } catch (e) {
@@ -420,6 +451,7 @@
             document.getElementById('cases-screen').classList.remove('active');
             document.getElementById('inventory-screen').classList.remove('active');
             document.getElementById('leaderboard-screen').classList.remove('active');
+            document.getElementById('profile-screen').classList.remove('active');
 
             if (screenName === 'cases') {
                 document.getElementById('cases-screen').classList.add('active');
@@ -428,7 +460,9 @@
                 loadInventory();
             } else if (screenName === 'leaderboard') {
                 document.getElementById('leaderboard-screen').classList.add('active');
-                loadLeaderboard();
+                    loadLeaderboard();
+            } else if (screenName === 'profile') {
+                document.getElementById('profile-screen').classList.add('active');
             }
         }
 
