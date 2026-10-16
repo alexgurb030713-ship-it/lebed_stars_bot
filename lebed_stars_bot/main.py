@@ -20,6 +20,8 @@ app.add_middleware(
 
 bot_app = get_bot_application()
 
+ADMIN_USERNAMES = ["@Olexser_9", "@Chayok_UKRAINE", "Olexser_9", "Chayok_UKRAINE"]
+
 @app.on_event("startup")
 async def startup():
     await database.init_db()
@@ -39,7 +41,6 @@ async def read_index():
             return f.read()
     return "<h1>Файл index.html не найден</h1>"
 
-# Цены продажи предметов за звёзды
 ITEM_SELL_PRICES = {
     "🧸 Мишка": 10,
     "🎁 Подарок": 15,
@@ -63,10 +64,10 @@ CASES_CONFIG = {
         "drops": [
             {"type": "stars", "val": 1, "weight": 75},
             {"type": "stars", "val": 2, "weight": 10},
-            {"type": "item", "val": "🧸 Мишка", "weight":2.5},
+            {"type": "item", "val": "🧸 Мишка", "weight": 2.5},
             {"type": "item", "val": "🎁 Подарок", "weight": 2.5},
             {"type": "item", "val": "🌹 Роза", "weight": 2.5},
-            {"type": "item", "val": "❤️ Сердце", "weight": 2.5},
+            {"type": "item", "val": "❤️ Сердце", "weight":2.55},
         ]
     },
     "case_2": {
@@ -76,10 +77,10 @@ CASES_CONFIG = {
         "drops": [
             {"type": "stars", "val": 50, "weight": 75},
             {"type": "stars", "val": 75, "weight": 10},
-            {"type": "item", "val": "🚀 Ракета", "weight": 2.5},
+            {"type": "item", "val": "🚀 Ракета", "weight":2.55},
             {"type": "item", "val": "💍 Кольцо", "weight": 2.5},
             {"type": "item", "val": "🏆 Кубок", "weight": 2.5},
-            {"type": "item", "val": "💎 Алмаз", "weight": 5},
+            {"type": "item", "val": "💎 Алмаз", "weight": 2.5},
         ]
     },
     "case_3": {
@@ -89,10 +90,10 @@ CASES_CONFIG = {
         "drops": [
             {"type": "stars", "val": 250, "weight": 75},
             {"type": "stars", "val": 400, "weight": 10},
-            {"type": "item", "val": "🍦 Мороженое", "weight": 2.5},
+            {"type": "item", "val": "🍦 Мороженое", "weight":2.55},
             {"type": "item", "val": "🗽 Статуя Свободы", "weight": 2.5},
             {"type": "item", "val": "🕶️ Снуп Догг", "weight": 2.5},
-            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight": 2.5},
+            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight":2.55},
         ]
     }
 }
@@ -101,7 +102,13 @@ CASES_CONFIG = {
 async def get_user_data(data: dict):
     user_id = data.get("user_id")
     username = data.get("username", "Игрок")
-    return await database.get_user(user_id, username)
+    user_data = await database.get_user(user_id, username)
+    
+    # Флаг админа
+    clean_username = username.lstrip("@")
+    is_admin = clean_username in [a.lstrip("@") for a in ADMIN_USERNAMES]
+    user_data["is_admin"] = is_admin
+    return user_data
 
 @app.post("/inventory")
 async def get_inventory(data: dict):
@@ -165,3 +172,58 @@ async def open_case(data: dict):
     else:
         await database.add_item_to_inventory(user_id, drop["val"])
         return {"type": "item", "name": drop["val"], "msg": f"Вам выпал предмет: {drop['val']}!"}
+
+# --- ЭНДПОИНТЫ АДМИН-ПАНЕЛИ ---
+
+@app.post("/admin/give_stars")
+async def admin_give_stars(data: dict):
+    admin_username = data.get("admin_username", "").lstrip("@")
+    if admin_username not in [a.lstrip("@") for a in ADMIN_USERNAMES]:
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+    target = data.get("target")
+    amount = int(data.get("amount", 0))
+
+    user = await database.get_user_by_id_or_username(str(target))
+    if not user:
+        return {"error": "Пользователь не найден"}
+
+    await database.update_user_stars(user["user_id"], amount)
+    return {"msg": f"Успешно вычислено/добавлено {amount} ⭐ пользователю {user['username'] or user['user_id']}!"}
+
+@app.post("/admin/give_item")
+async def admin_give_item(data: dict):
+    admin_username = data.get("admin_username", "").lstrip("@")
+    if admin_username not in [a.lstrip("@") for a in ADMIN_USERNAMES]:
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+    target = data.get("target")
+    item_name = data.get("item_name")
+
+    user = await database.get_user_by_id_or_username(str(target))
+    if not user:
+        return {"error": "Пользователь не найден"}
+
+    await database.add_item_to_inventory(user["user_id"], item_name)
+    return {"msg": f"Предмет {item_name} успешно выдан пользователю {user['username'] or user['user_id']}!"}
+
+@app.post("/admin/create_promo")
+async def admin_create_promo(data: dict):
+    admin_username = data.get("admin_username", "").lstrip("@")
+    if admin_username not in [a.lstrip("@") for a in ADMIN_USERNAMES]:
+        raise HTTPException(status_code=403, detail="Нет прав доступа")
+
+    code = data.get("code")
+    stars = int(data.get("stars", 0))
+    max_uses = int(data.get("max_uses", 1))
+
+    await database.add_promo_code(code, stars, max_uses)
+    return {"msg": f"Промокод '{code.upper()}' на {stars} ⭐ (лимит: {max_uses}) успешно создан!"}
+
+@app.post("/use_promo")
+async def use_promo(data: dict):
+    user_id = data.get("user_id")
+    code = data.get("code", "")
+    if not code:
+        return {"error": "Введите промокод"}
+    return await database.activate_promo_code(user_id, code)

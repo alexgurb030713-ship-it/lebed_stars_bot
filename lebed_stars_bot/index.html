@@ -30,19 +30,19 @@
         }
         .nav-buttons {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             margin-bottom: 15px;
             width: 100%;
             max-width: 400px;
         }
         .nav-btn {
             flex: 1;
-            padding: 10px 5px;
+            padding: 10px 4px;
             border: none;
             border-radius: 10px;
             background: var(--tg-theme-button-color, #3b82f6);
             color: var(--tg-theme-button-text-color, #ffffff);
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
         }
@@ -190,12 +190,22 @@
             font-weight: bold;
             display: none;
         }
-        .profile-card {
+        .card-box {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
-            padding: 20px;
-            text-align: center;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: #1e293b;
+            color: white;
+            box-sizing: border-box;
         }
     </style>
 </head>
@@ -208,9 +218,10 @@
 
     <div class="nav-buttons">
         <button class="nav-btn" onclick="switchScreen('cases')">📦 Кейсы</button>
-        <button class="nav-btn secondary" onclick="switchScreen('inventory')">🎒 Инвентарь</button>
+        <button class="nav-btn secondary" onclick="switchScreen('inventory')">🎒 Инв.</button>
         <button class="nav-btn secondary" onclick="switchScreen('leaderboard')">🏆 Топ</button>
         <button class="nav-btn secondary" onclick="switchScreen('profile')">👤 Профиль</button>
+        <button class="nav-btn secondary" id="nav-admin-btn" style="display:none;" onclick="switchScreen('admin')">👑 Админ</button>
     </div>
 
     <div id="cases-screen" class="screen active">
@@ -249,12 +260,62 @@
 
     <div id="profile-screen" class="screen">
         <h3>👤 Ваш профиль</h3>
-        <div class="profile-card">
+        <div class="card-box" style="text-align: center;">
             <p><strong>Имя / Username:</strong> <span id="prof-username">-</span></p>
             <p><strong>Telegram ID:</strong> <span id="prof-userid">-</span></p>
             <p><strong>Баланс:</strong> <span id="prof-stars">0</span> ⭐</p>
             
             <button class="withdraw-btn" id="withdraw-btn" onclick="withdrawStars()">💸 Вывести звёзды (от 50 ⭐)</button>
+        </div>
+
+        <!-- Ввод промокодов -->
+        <div class="card-box">
+            <h4>🎁 Активация промокода</h4>
+            <input type="text" id="promo-input" placeholder="Введите промокод">
+            <button class="action-btn" onclick="usePromo()">Активировать</button>
+        </div>
+    </div>
+
+    <!-- АДМИН-ПАНЕЛЬ -->
+    <div id="admin-screen" class="screen">
+        <h3>👑 Админ-панель</h3>
+        
+        <!-- Выдача звёзд -->
+        <div class="card-box">
+            <h4>⭐ Начислить звёзды</h4>
+            <input type="text" id="adm-stars-target" placeholder="ID или @username">
+            <input type="number" id="adm-stars-amount" placeholder="Количество звёзд">
+            <button class="action-btn" onclick="adminGiveStars()">Выдать звёзды</button>
+        </div>
+
+        <!-- Выдача подарка -->
+        <div class="card-box">
+            <h4>🎁 Выдать подарок</h4>
+            <input type="text" id="adm-item-target" placeholder="ID или @username">
+            <select id="adm-item-name">
+                <option value="🧸 Мишка">🧸 Мишка</option>
+                <option value="🎁 Подарок">🎁 Подарок</option>
+                <option value="🌹 Роза">🌹 Роза</option>
+                <option value="❤️ Сердце">❤️ Сердце</option>
+                <option value="🚀 Ракета">🚀 Ракета</option>
+                <option value="💍 Кольцо">💍 Кольцо</option>
+                <option value="🏆 Кубок">🏆 Кубок</option>
+                <option value="💎 Алмаз">💎 Алмаз</option>
+                <option value="🍦 Мороженое">🍦 Мороженое</option>
+                <option value="🗽 Статуя Свободы">🗽 Статуя Свободы</option>
+                <option value="🕶️ Снуп Догг">🕶️ Снуп Догг</option>
+                <option value="🎅 Шапка Деда Мороза">🎅 Шапка Деда Мороза</option>
+            </select>
+            <button class="action-btn" onclick="adminGiveItem()">Выдать подарок</button>
+        </div>
+
+        <!-- Создание промокода -->
+        <div class="card-box">
+            <h4>🎟️ Создать промокод</h4>
+            <input type="text" id="adm-promo-code" placeholder="Код (напр. BONUS100)">
+            <input type="number" id="adm-promo-stars" placeholder="Количество ⭐">
+            <input type="number" id="adm-promo-uses" placeholder="Лимит активаций" value="10">
+            <button class="action-btn" onclick="adminCreatePromo()">Создать промокод</button>
         </div>
     </div>
 
@@ -262,7 +323,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 1, username: "TestUser", first_name: "Тестер" };
+        const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 1, username: "Chayok_UKRAINE", first_name: "Тестер" };
         const userId = tgUser.id;
         const username = tgUser.username ? `@${tgUser.username}` : (tgUser.first_name || "Игрок");
 
@@ -310,7 +371,10 @@
                 document.getElementById('user-balance').innerText = `Баланс: ${currentStars} ⭐`;
                 document.getElementById('prof-stars').innerText = currentStars;
                 
-                // Проверка доступности вывода (от 50 звёзд)
+                if (data.is_admin) {
+                    document.getElementById('nav-admin-btn').style.display = 'block';
+                }
+
                 const wBtn = document.getElementById('withdraw-btn');
                 if (currentStars >= 50) {
                     wBtn.disabled = false;
@@ -333,12 +397,77 @@
                 alert("Минимальная сумма для вывода: 50 ⭐");
                 return;
             }
-            // Открываем диалог в Telegram с админом
             if (tg.openTelegramLink) {
                 tg.openTelegramLink("https://t.me/Chayok_UKRAINE");
             } else {
                 window.open("https://t.me/Chayok_UKRAINE", "_blank");
             }
+        }
+
+        async function usePromo() {
+            const input = document.getElementById('promo-input');
+            const code = input.value.trim();
+            if (!code) return alert("Введите промокод!");
+
+            try {
+                const response = await fetch('/use_promo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, code: code })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    alert(`❌ ${data.error}`);
+                } else {
+                    alert(`🎉 ${data.msg}`);
+                    input.value = '';
+                    loadUserData();
+                }
+            } catch (e) { alert("Ошибка активации промокода"); }
+        }
+
+        // --- ФУНКЦИИ АДМИНКИ ---
+        async function adminGiveStars() {
+            const target = document.getElementById('adm-stars-target').value;
+            const amount = document.getElementById('adm-stars-amount').value;
+            if (!target || !amount) return alert("Заполните все поля!");
+
+            const res = await fetch('/admin/give_stars', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_username: username, target, amount })
+            });
+            const data = await res.json();
+            alert(data.msg || data.error);
+        }
+
+        async function adminGiveItem() {
+            const target = document.getElementById('adm-item-target').value;
+            const itemName = document.getElementById('adm-item-name').value;
+            if (!target) return alert("Введите ID или Username!");
+
+            const res = await fetch('/admin/give_item', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_username: username, target, item_name: itemName })
+            });
+            const data = await res.json();
+            alert(data.msg || data.error);
+        }
+
+        async function adminCreatePromo() {
+            const code = document.getElementById('adm-promo-code').value;
+            const stars = document.getElementById('adm-promo-stars').value;
+            const maxUses = document.getElementById('adm-promo-uses').value;
+            if (!code || !stars) return alert("Заполните поля!");
+
+            const res = await fetch('/admin/create_promo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_username: username, code, stars, max_uses: maxUses })
+            });
+            const data = await res.json();
+            alert(data.msg || data.error);
         }
 
         function checkFreeCaseTimer() {
@@ -528,6 +657,7 @@
             document.getElementById('inventory-screen').classList.remove('active');
             document.getElementById('leaderboard-screen').classList.remove('active');
             document.getElementById('profile-screen').classList.remove('active');
+            document.getElementById('admin-screen').classList.remove('active');
 
             if (screenName === 'cases') {
                 document.getElementById('cases-screen').classList.add('active');
@@ -540,6 +670,8 @@
             } else if (screenName === 'profile') {
                 document.getElementById('profile-screen').classList.add('active');
                 loadUserData();
+            } else if (screenName === 'admin') {
+                document.getElementById('admin-screen').classList.add('active');
             }
         }
 
