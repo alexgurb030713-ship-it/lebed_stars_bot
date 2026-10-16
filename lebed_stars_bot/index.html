@@ -145,6 +145,32 @@
             background: #64748b;
             cursor: not-allowed;
         }
+        .sell-btn {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .withdraw-btn {
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 14px;
+            width: 100%;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .withdraw-btn:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
         .inventory-item {
             background: rgba(255, 255, 255, 0.05);
             padding: 12px 16px;
@@ -180,7 +206,6 @@
         <div class="balance" id="user-balance">Баланс: загрузка... ⭐</div>
     </div>
 
-    <!-- Навигация (добавлена кнопка Профиль) -->
     <div class="nav-buttons">
         <button class="nav-btn" onclick="switchScreen('cases')">📦 Кейсы</button>
         <button class="nav-btn secondary" onclick="switchScreen('inventory')">🎒 Инвентарь</button>
@@ -188,7 +213,6 @@
         <button class="nav-btn secondary" onclick="switchScreen('profile')">👤 Профиль</button>
     </div>
 
-    <!-- Экран кейсов -->
     <div id="cases-screen" class="screen active">
         <div class="roulette-wrapper">
             <div class="roulette-pointer"></div>
@@ -213,24 +237,24 @@
         </div>
     </div>
 
-    <!-- Экран инвентаря -->
     <div id="inventory-screen" class="screen">
         <h3>Ваши уникальные предметы</h3>
         <div id="inventory-list"></div>
     </div>
 
-    <!-- Экран топа (теперь с Юзернеймом и ID) -->
     <div id="leaderboard-screen" class="screen">
         <h3>🏆 Топ игроков</h3>
         <div id="leaderboard-list"></div>
     </div>
 
-    <!-- Экран профиля -->
     <div id="profile-screen" class="screen">
         <h3>👤 Ваш профиль</h3>
         <div class="profile-card">
             <p><strong>Имя / Username:</strong> <span id="prof-username">-</span></p>
             <p><strong>Telegram ID:</strong> <span id="prof-userid">-</span></p>
+            <p><strong>Баланс:</strong> <span id="prof-stars">0</span> ⭐</p>
+            
+            <button class="withdraw-btn" id="withdraw-btn" onclick="withdrawStars()">💸 Вывести звёзды (от 50 ⭐)</button>
         </div>
     </div>
 
@@ -238,17 +262,23 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Достаем данные пользователя из Telegram WebApp
         const tgUser = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 1, username: "TestUser", first_name: "Тестер" };
         const userId = tgUser.id;
         const username = tgUser.username ? `@${tgUser.username}` : (tgUser.first_name || "Игрок");
 
+        let currentStars = 0;
         let isSpinning = false;
         let lastFreeOpenTime = 0;
         const COOLDOWN_TIME = 86400;
 
+        const ITEM_PRICES = {
+            "🧸 Мишка": 10, "🎁 Подарок": 15, "🌹 Роза": 10, "❤️ Сердце": 10,
+            "🚀 Ракета": 75, "💍 Кольцо": 75, "🏆 Кубок": 75, "💎 Алмаз": 75,
+            "🍦 Мороженое": 300, "🗽 Статуя Свободы": 300, "🕶️ Снуп Догг": 300, "🎅 Шапка Деда Мороза": 300
+        };
+
         const ALL_ITEMS = [
-            "10 ⭐", "25 ⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
+            "1 ⭐", "2 ⭐", "🧸 Мишка", "🎁 Подарок", "🌹 Роза", "❤️ Сердце",
             "50 ⭐", "75 ⭐", "🚀 Ракета", "💍 Кольцо", "🏆 Кубок", "💎 Алмаз",
             "250 ⭐", "400 ⭐", "🍦 Мороженое", "🗽 Статуя", "🕶️ Снуп Догг", "🎅 Шапка"
         ];
@@ -275,15 +305,40 @@
                     body: JSON.stringify({ user_id: userId, username: username })
                 });
                 const data = await response.json();
-                document.getElementById('user-balance').innerText = `Баланс: ${data.stars} ⭐`;
                 
+                currentStars = data.stars;
+                document.getElementById('user-balance').innerText = `Баланс: ${currentStars} ⭐`;
+                document.getElementById('prof-stars').innerText = currentStars;
+                
+                // Проверка доступности вывода (от 50 звёзд)
+                const wBtn = document.getElementById('withdraw-btn');
+                if (currentStars >= 50) {
+                    wBtn.disabled = false;
+                    wBtn.innerText = `💸 Вывести ${currentStars} ⭐`;
+                } else {
+                    wBtn.disabled = true;
+                    wBtn.innerText = `💸 Вывести звёзды (от 50 ⭐)`;
+                }
+
                 lastFreeOpenTime = data.last_free_open || 0;
                 checkFreeCaseTimer();
 
-                // Заполняем профиль
                 document.getElementById('prof-username').innerText = data.username || username;
                 document.getElementById('prof-userid').innerText = userId;
             } catch (e) { console.error(e); }
+        }
+
+        function withdrawStars() {
+            if (currentStars < 50) {
+                alert("Минимальная сумма для вывода: 50 ⭐");
+                return;
+            }
+            // Открываем диалог в Telegram с админом
+            if (tg.openTelegramLink) {
+                tg.openTelegramLink("https://t.me/Chayok_UKRAINE");
+            } else {
+                window.open("https://t.me/Chayok_UKRAINE", "_blank");
+            }
         }
 
         function checkFreeCaseTimer() {
@@ -311,7 +366,6 @@
             
             const modal = document.getElementById('result-modal');
             modal.style.display = 'none';
-            
             setButtonsDisabled(true);
 
             try {
@@ -395,6 +449,24 @@
             });
         }
 
+        async function sellItem(itemId) {
+            try {
+                const response = await fetch('/sell_item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, item_id: itemId })
+                });
+                const data = await response.json();
+                if (data.msg) {
+                    alert(data.msg);
+                    loadUserData();
+                    loadInventory();
+                }
+            } catch (e) {
+                alert("Ошибка продажи предмета");
+            }
+        }
+
         async function loadInventory() {
             const listDiv = document.getElementById('inventory-list');
             listDiv.innerHTML = '<p style="text-align: center; opacity: 0.6;">Загрузка...</p>';
@@ -411,9 +483,13 @@
                 }
                 listDiv.innerHTML = '';
                 items.forEach(item => {
+                    const price = ITEM_PRICES[item.name] || 10;
                     const div = document.createElement('div');
                     div.className = 'inventory-item';
-                    div.innerHTML = `<span>🎁 ${item}</span>`;
+                    div.innerHTML = `
+                        <span>🎁 ${item.name}</span>
+                        <button class="sell-btn" onclick="sellItem(${item.id})">Продать (+${price} ⭐)</button>
+                    `;
                     listDiv.appendChild(div);
                 });
             } catch (e) {
@@ -460,9 +536,10 @@
                 loadInventory();
             } else if (screenName === 'leaderboard') {
                 document.getElementById('leaderboard-screen').classList.add('active');
-                    loadLeaderboard();
+                loadLeaderboard();
             } else if (screenName === 'profile') {
                 document.getElementById('profile-screen').classList.add('active');
+                loadUserData();
             }
         }
 

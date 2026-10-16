@@ -39,15 +39,31 @@ async def read_index():
             return f.read()
     return "<h1>Файл index.html не найден</h1>"
 
+# Цены продажи предметов за звёзды
+ITEM_SELL_PRICES = {
+    "🧸 Мишка": 10,
+    "🎁 Подарок": 15,
+    "🌹 Роза": 10,
+    "❤️ Сердце": 10,
+    "🚀 Ракета": 75,
+    "💍 Кольцо": 75,
+    "🏆 Кубок": 75,
+    "💎 Алмаз": 75,
+    "🍦 Мороженое": 300,
+    "🗽 Статуя Свободы": 300,
+    "🕶️ Снуп Догг": 300,
+    "🎅 Шапка Деда Мороза": 300
+}
+
 CASES_CONFIG = {
     "case_1": {
         "name": "Бесплатный кейс",
         "price": 0,
-        "cooldown": 86400, # 24 часа в секундах
+        "cooldown": 86400,
         "drops": [
-            {"type": "stars", "val": 1, "weight": 75},
-            {"type": "stars", "val": 2, "weight": 10},
-            {"type": "item", "val": "🧸 Мишка", "weight": 2.5},
+            {"type": "stars", "val": 10, "weight": 75},
+            {"type": "stars", "val": 25, "weight": 10},
+            {"type": "item", "val": "🧸 Мишка", "weight":2.5},
             {"type": "item", "val": "🎁 Подарок", "weight": 2.5},
             {"type": "item", "val": "🌹 Роза", "weight": 2.5},
             {"type": "item", "val": "❤️ Сердце", "weight": 2.5},
@@ -63,7 +79,7 @@ CASES_CONFIG = {
             {"type": "item", "val": "🚀 Ракета", "weight": 2.5},
             {"type": "item", "val": "💍 Кольцо", "weight": 2.5},
             {"type": "item", "val": "🏆 Кубок", "weight": 2.5},
-            {"type": "item", "val": "💎 Алмаз", "weight": 2.5},
+            {"type": "item", "val": "💎 Алмаз", "weight": 5},
         ]
     },
     "case_3": {
@@ -76,7 +92,7 @@ CASES_CONFIG = {
             {"type": "item", "val": "🍦 Мороженое", "weight": 2.5},
             {"type": "item", "val": "🗽 Статуя Свободы", "weight": 2.5},
             {"type": "item", "val": "🕶️ Снуп Догг", "weight": 2.5},
-            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight":2.5},
+            {"type": "item", "val": "🎅 Шапка Деда Мороза", "weight": 2.5},
         ]
     }
 }
@@ -96,6 +112,19 @@ async def get_inventory(data: dict):
 async def get_top():
     return await database.get_top_players()
 
+@app.post("/sell_item")
+async def sell_item(data: dict):
+    user_id = data.get("user_id")
+    item_id = data.get("item_id")
+    
+    item_name = await database.remove_item_from_inventory(item_id, user_id)
+    if not item_name:
+        raise HTTPException(status_code=400, detail="Предмет не найден")
+        
+    price = ITEM_SELL_PRICES.get(item_name, 10)
+    await database.update_user_stars(user_id, price)
+    return {"msg": f"Вы успешно продали {item_name} за {price} ⭐!", "added_stars": price}
+
 @app.post("/open_case")
 async def open_case(data: dict):
     user_id = data.get("user_id")
@@ -108,7 +137,6 @@ async def open_case(data: dict):
     user = await database.get_user(user_id)
     current_time = time.time()
     
-    # Проверка кулдауна для бесплатного кейса
     if case_id == "case_1":
         last_open = user.get("last_free_open", 0)
         time_passed = current_time - last_open
@@ -118,14 +146,12 @@ async def open_case(data: dict):
             minutes = (remaining % 3600) // 60
             return {"error": f"Бесплатный кейс будет доступен через {hours} ч. {minutes} мин."}
     
-    # Проверка баланса для платных кейсов
     if user.get("stars", 0) < case_info["price"]:
         return {"error": "Недостаточно звёзд на балансе!"}
     
     if case_info["price"] > 0:
         await database.update_user_stars(user_id, -case_info["price"])
 
-    # Если открыли бесплатный кейс — фиксируем время
     if case_id == "case_1":
         await database.update_last_free_open(user_id, current_time)
 
